@@ -1,0 +1,5 @@
+/target
+**/*.rs.bk
+
+# this is a generated file from lalrpop
+src/lang.rs

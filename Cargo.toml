@@ -1,0 +1,16 @@
+[package]
+name = "procfind"
+version = "0.1.0"
+authors = ["Andrew Chin <achin@eminence32.net>"]
+
+[build-dependencies]
+lalrpop = "0.15.2"
+
+[dependencies]
+lalrpop-util = "0.15.2"
+regex = "0.2.1"
+procfs = {git="https://github.com/eminence/procfs"}
+lazy_static = "1"
+clap = "2"
+libc = "*"
+

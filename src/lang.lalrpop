@@ -1,0 +1,70 @@
+
+use ast;
+use lexer;
+
+
+grammar;
+
+pub TestClause: (String, String) = {
+    <a:"word"> "and" <b:"word"> => (a, b)
+}
+
+pub RawClause: ast::RawClause = {
+    <a:RawClause> "or" <b:Factor> => ast::RawClause::Or(Box::new(a), Box::new(b)),
+    Factor
+}
+
+pub Factor: ast::RawClause = {
+    <a:Factor> "and" <b:Term> => ast::RawClause::And(Box::new(a), Box::new(b)),
+    Term
+}
+
+pub Term: ast::RawClause = {
+    <a:Word> <o:Op> <b:Word> => ast::RawClause::Expr(a, o, b),
+    <a:Word> <o:Word> <b:Word> => ast::RawClause::Expr(a, ast::Op::from_word(o), b),
+    "(" <RawClause> ")"
+}
+
+
+pub Op: ast::Op = {
+    //"eq" => ast::Op::StrEquals,
+    //"neq" => ast::Op::StrNotEquals,
+    //"like" => ast::Op::Like,
+    "==" => ast::Op::Equals,
+    "!=" => ast::Op::NotEquals,
+    ">" => ast::Op::GreaterThan,
+    ">=" => ast::Op::GreaterThanEq,
+    "<" => ast::Op::LessThan,
+    "<=" => ast::Op::LessThanEq,
+    //! => {errors.push(<>); ast::Op::Unknown}
+}
+
+
+pub Word: String = {
+    //"quoted string" => <>.to_owned(),
+    "word" => <>
+}
+
+extern {
+    type Location = usize;
+    type Error = lexer::LexicalError;
+
+    enum lexer::Token {
+        "and" => lexer::Token::And,
+        "or" => lexer::Token::Or,
+        "(" => lexer::Token::LParen,
+        ")" => lexer::Token::RParen,
+        "==" => lexer::Token::Equals,
+        "!=" => lexer::Token::NotEquals,
+        ">" => lexer::Token::GreaterThan,
+        ">=" => lexer::Token::GreaterThanEq,
+        "<" => lexer::Token::LessThan,
+        "<=" => lexer::Token::LessThanEq,
+        "word" => lexer::Token::Word(<String>)
+
+
+
+
+    }
+
+}
