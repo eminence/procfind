@@ -1,41 +1,37 @@
 #![feature(nll)]
 
-extern crate procfs;
-extern crate lalrpop_util;
-extern crate regex;
-extern crate clap;
-extern crate libc;
 extern crate chrono;
+extern crate clap;
+extern crate lalrpop_util;
+extern crate libc;
+extern crate procfs;
+extern crate regex;
 
 #[macro_use]
 extern crate lazy_static;
 
-use procfs::{ProcResult, Meminfo,Process};
+use procfs::{Meminfo, ProcResult, Process};
 
-use regex::Regex;
 use clap::{App, Arg};
+use regex::Regex;
 
 mod ast;
+pub mod lang;
 mod lexer;
 mod util;
-pub mod lang;
 
 lazy_static! {
-    pub static ref BYTES_REGEX: Regex = {
-        Regex::new(r"^(\d+)((?:[kKMG]i?)?B)?$").expect("Failed to compile bytes regex")
-    };
-    pub static ref DURATION_REGEX: Regex = {
-        Regex::new(r"^(\d+)([a-z]+)$").expect("Failed to compile duration regex")
-    };
-
-    pub static ref MEMINFO: Meminfo = {
-        Meminfo::new().unwrap()
-    };
-
+    pub static ref BYTES_REGEX: Regex =
+        { Regex::new(r"^(\d+)((?:[kKMG]i?)?B)?$").expect("Failed to compile bytes regex") };
+    pub static ref DURATION_REGEX: Regex =
+        { Regex::new(r"^(\d+)([a-z]+)$").expect("Failed to compile duration regex") };
+    pub static ref MEMINFO: Meminfo = { Meminfo::new().unwrap() };
 }
 
 #[cfg(test)]
-fn parse(s: &str) -> Result<ast::RawClause, lalrpop_util::ParseError<usize, lexer::Token, lexer::LexicalError>> {
+fn parse(
+    s: &str,
+) -> Result<ast::RawClause, lalrpop_util::ParseError<usize, lexer::Token, lexer::LexicalError>> {
     let l = lexer::Lexer::new(s);
     let p = lang::RawClauseParser::new();
     p.parse(l)
@@ -44,35 +40,38 @@ fn parse(s: &str) -> Result<ast::RawClause, lalrpop_util::ParseError<usize, lexe
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ast::{RawClause, Op};
-    use std::fmt::Debug;
+    use ast::{Op, RawClause};
     use std::cmp::PartialEq;
+    use std::fmt::Debug;
 
-    fn expect_expr<A, O, B>(expr: &RawClause, a: A, o: O, b: B) 
-        where A: Debug,
-              String: PartialEq<A>,
-              O: Debug,
-              Op: PartialEq<O>,
-              B: Debug,
-              String: PartialEq<B>
-        {
-            match expr {
-                &RawClause::Expr(ref aa, ref oo, ref bb) => {
-                    assert_eq!(aa, &a);
-                    assert_eq!(oo, &o);
-                    assert_eq!(bb, &b);
-                }
-                expr => panic!("Unable to match the following clause as an expression:\n{:?}", expr)
+    fn expect_expr<A, O, B>(expr: &RawClause, a: A, o: O, b: B)
+    where
+        A: Debug,
+        String: PartialEq<A>,
+        O: Debug,
+        Op: PartialEq<O>,
+        B: Debug,
+        String: PartialEq<B>,
+    {
+        match expr {
+            &RawClause::Expr(ref aa, ref oo, ref bb) => {
+                assert_eq!(aa, &a);
+                assert_eq!(oo, &o);
+                assert_eq!(bb, &b);
             }
-
+            expr => panic!(
+                "Unable to match the following clause as an expression:\n{:?}",
+                expr
+            ),
         }
+    }
 
     /// Tests all of the different operators
     #[test]
     fn test_simple_parsing() {
         let expr = parse("a == b").unwrap();
         expect_expr(&expr, "a", Op::Equals, "b");
-        
+
         let expr = parse("a != b").unwrap();
         expect_expr(&expr, "a", Op::NotEquals, "b");
 
@@ -84,10 +83,10 @@ mod tests {
 
         let expr = parse("a < b").unwrap();
         expect_expr(&expr, "a", Op::LessThan, "b");
-        
+
         let expr = parse("a <= b").unwrap();
         expect_expr(&expr, "a", Op::LessThanEq, "b");
-        
+
         let expr = parse("a like b").unwrap();
         expect_expr(&expr, "a", Op::Like, "b");
     }
@@ -95,7 +94,6 @@ mod tests {
     /// Tests nested clauses
     #[test]
     fn test_nested_clauses() {
-
         let expr = parse("a == b and c > 4").unwrap();
         println!("{:?}", expr);
         match expr {
@@ -103,11 +101,9 @@ mod tests {
                 expect_expr(&*left, "a", Op::Equals, "b");
                 expect_expr(&*right, "c", Op::GreaterThan, "4");
             }
-            _ => panic!("Did not parse into an And clause")
-
+            _ => panic!("Did not parse into an And clause"),
         }
 
-        
         let expr = parse("a == b or c > 4").unwrap();
         println!("{:?}", expr);
         match expr {
@@ -115,8 +111,7 @@ mod tests {
                 expect_expr(&*left, "a", Op::Equals, "b");
                 expect_expr(&*right, "c", Op::GreaterThan, "4");
             }
-            _ => panic!("Did not parse into an And clause")
-
+            _ => panic!("Did not parse into an And clause"),
         }
 
         let expr = parse("a == a and (b == b or c == c)").unwrap();
@@ -129,16 +124,13 @@ mod tests {
                     RawClause::Or(ref b, ref c) => {
                         expect_expr(&*b, "b", Op::Equals, "b");
                         expect_expr(&*c, "c", Op::Equals, "c");
-
                     }
-                    _ => panic!("Did not parse into an Or clause")
+                    _ => panic!("Did not parse into an Or clause"),
                 }
             }
-            _ => panic!("Did not parse into an And clause")
+            _ => panic!("Did not parse into an And clause"),
         }
-
     }
-
 
     #[test]
     fn test_check() {
@@ -165,7 +157,6 @@ mod tests {
     }
 }
 
-
 struct ProcFormatter<'a, 'b> {
     proc_obj: &'a Process,
     formats: &'b [&'b str],
@@ -173,12 +164,16 @@ struct ProcFormatter<'a, 'b> {
 
 impl<'a, 'b> std::fmt::Display for ProcFormatter<'a, 'b> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-
         for fms in self.formats.iter() {
             match *fms {
                 "pid" => write!(f, "{}", self.proc_obj.stat.pid)?,
                 "uid" => write!(f, "{}", self.proc_obj.owner)?,
-                "owner" | "user" => write!(f, "{}", util::lookup_username(self.proc_obj.owner).unwrap_or(format!("{}", self.proc_obj.owner)))?,
+                "owner" | "user" => write!(
+                    f,
+                    "{}",
+                    util::lookup_username(self.proc_obj.owner)
+                        .unwrap_or(format!("{}", self.proc_obj.owner))
+                )?,
                 "comm" => write!(f, "{}", self.proc_obj.stat.comm)?,
                 "cmdline" => {
                     let cmdline = self.proc_obj.cmdline();
@@ -196,11 +191,8 @@ impl<'a, 'b> std::fmt::Display for ProcFormatter<'a, 'b> {
         }
 
         Ok(())
-
     }
-
 }
-
 
 fn get_signal_from_name(sig: &str) -> Option<i32> {
     match sig {
@@ -210,49 +202,51 @@ fn get_signal_from_name(sig: &str) -> Option<i32> {
         "SIGHUP" | "HUP" => Some(libc::SIGHUP),
         "SIGUSR1" | "USR1" => Some(libc::SIGUSR1),
         "SIGUSR2" | "USR2" => Some(libc::SIGUSR2),
-        _ => None
+        _ => None,
     }
 }
 
 fn get_signal_from_int(sig: &str) -> Option<i32> {
     i32::from_str_radix(sig, 10).ok().and_then(|int| match int {
-        | libc::SIGINT 
+        | libc::SIGINT
         | libc::SIGKILL
         | libc::SIGTERM
         | libc::SIGHUP
         | libc::SIGUSR1
         | libc::SIGUSR2 => Some(int),
-        _ => None
+        _ => None,
     })
-
 }
-
 
 fn main() {
     let matches = App::new("procfind")
-        .arg(Arg::with_name("pred")
-             .takes_value(true)
-             .help("Process search filter string"))
-        .arg(Arg::with_name("output")
-             .short("o")
-             .long("output")
-             .takes_value(true)
-             .help("Output format"))
-        .arg(Arg::with_name("signal")
-            .long("signal")
-            .takes_value(true)
-            .help("Signal to send to each matching process"))
+        .arg(
+            Arg::with_name("pred")
+                .takes_value(true)
+                .help("Process search filter string"),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .takes_value(true)
+                .help("Output format"),
+        )
+        .arg(
+            Arg::with_name("signal")
+                .long("signal")
+                .takes_value(true)
+                .help("Signal to send to each matching process"),
+        )
         .get_matches();
 
-
     let signal: Option<i32> = matches.value_of("signal").and_then(|s| {
-            let sig = get_signal_from_name(s).or_else(|| get_signal_from_int(s));
-            if sig.is_none() {
-                eprintln!("Warning: {} is not a recognized signal", s);
-            }
-            sig
+        let sig = get_signal_from_name(s).or_else(|| get_signal_from_int(s));
+        if sig.is_none() {
+            eprintln!("Warning: {} is not a recognized signal", s);
+        }
+        sig
     });
-    
 
     let pred = if let Some(values) = matches.value_of("pred") {
         values
@@ -280,16 +274,21 @@ fn main() {
     };
 
     let all_procs = procfs::all_processes();
-    let matching = all_procs.iter().filter(|procs| clause.evaluate(procs).unwrap());
+    let matching = all_procs
+        .iter()
+        .filter(|procs| clause.evaluate(procs).unwrap());
 
     let fmt: Vec<&str> = if let Some(output_format) = matches.value_of("output") {
-       output_format.split(',').collect()
+        output_format.split(',').collect()
     } else {
-        vec!("pid", "comm")
+        vec!["pid", "comm"]
     };
 
     for mproc in matching {
-        let fproc = ProcFormatter { proc_obj: &mproc, formats: &fmt};
+        let fproc = ProcFormatter {
+            proc_obj: &mproc,
+            formats: &fmt,
+        };
         println!("{}", fproc);
         if let Some(s) = signal {
             println!("Sending signal {} to pid {}", s, mproc.pid());
