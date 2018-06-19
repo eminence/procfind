@@ -5,11 +5,12 @@ extern crate lalrpop_util;
 extern crate regex;
 extern crate clap;
 extern crate libc;
+extern crate chrono;
 
 #[macro_use]
 extern crate lazy_static;
 
-use procfs::{ProcResult, Meminfo,Proc};
+use procfs::{ProcResult, Meminfo,Process};
 
 use regex::Regex;
 use clap::{App, Arg};
@@ -21,7 +22,10 @@ pub mod lang;
 
 lazy_static! {
     pub static ref BYTES_REGEX: Regex = {
-        Regex::new(r"^(\d+)((?:[kKMG]i?)?B)?$").expect("Failed to compile regex")
+        Regex::new(r"^(\d+)((?:[kKMG]i?)?B)?$").expect("Failed to compile bytes regex")
+    };
+    pub static ref DURATION_REGEX: Regex = {
+        Regex::new(r"^(\d+)([a-z]+)$").expect("Failed to compile duration regex")
     };
 
     pub static ref MEMINFO: Meminfo = {
@@ -163,7 +167,7 @@ mod tests {
 
 
 struct ProcFormatter<'a, 'b> {
-    proc_obj: &'a Proc,
+    proc_obj: &'a Process,
     formats: &'b [&'b str],
 }
 

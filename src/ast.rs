@@ -1,9 +1,13 @@
 #[cfg(test)]
 extern crate libc;
 
-use {BYTES_REGEX, MEMINFO};
-use procfs::Proc;
+extern crate chrono;
+
+use {BYTES_REGEX, MEMINFO, DURATION_REGEX};
+use procfs::{Process, ProcResult, MMapPath, ProcState};
 use util;
+use chrono::offset::Local;
+use chrono::Duration;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum RawClause {
@@ -44,7 +48,7 @@ pub enum Clause {
 
 impl Clause {
     /// Test if a given process matches this clause
-    pub fn evaluate(&self, p: &Proc) -> Result<bool, String> {
+    pub fn evaluate(&self, p: &Process) -> Result<bool, String> {
         match self {
             Clause::And(a, b) => Ok(a.evaluate(p)? && b.evaluate(p)?),
             Clause::Or(a, b) => Ok(a.evaluate(p)? || b.evaluate(p)?),
@@ -56,6 +60,33 @@ impl Clause {
                 (Field::Rss, op, Value::Percent(pct)) => Ok(op.compare_numeric(p.stat.rss_bytes(), (MEMINFO.mem_total as f64 * *pct as f64) as i64)),
                 (Field::Vsize, op, Value::Bytes(bytes)) => Ok(op.compare_numeric(p.stat.vsize, *bytes as u64)),
                 (Field::Vsize, op, Value::Percent(pct)) => Ok(op.compare_numeric(p.stat.vsize, (MEMINFO.mem_total as f64 * *pct as f64) as u64)),
+                (Field::Age, op, Value::Duration(dur)) => {
+                    let proc_age = Local::now() - p.stat.starttime();
+                    Ok(op.compare_numeric(proc_age, *dur))
+                },
+                (Field::Cmdline, op, Value::S(s)) => {
+                    let full_cmd = p.cmdline().unwrap().join(" ");
+                    Ok(op.compare_str(&full_cmd, s))
+                }
+                (Field::Maps, op, Value::S(s)) => 
+                    // check to see if this string is in the pathname of any of the maps of this
+                    // process
+                    if let ProcResult::Ok(maps) = p.maps() {
+                        Ok(maps.iter().any(|map| match map.pathname {
+                            MMapPath::Path(ref p) => op.compare_str(&p.to_string_lossy(), s),
+                            _ => false
+                        }))
+                    } else {
+                        Ok(false)
+                    },
+                (Field::State, op, Value::State(state)) => Ok(op.compare_eq(p.stat.state(), *state)),
+                (Field::Cwd, op, Value::S(s)) => {
+                    match p.cwd() {
+                        ProcResult::Ok(cwd) => Ok(op.compare_str(&cwd.to_string_lossy(), s)),
+                        _ => Ok(false)
+                    }
+                }
+
                 //(Field::Cmdline, op, Value::S(value)) if op.is_string() => Ok(op.compare_str
 
                 _ => Err(format!("Invalid clause: {:?} {:?} {:?}", field, op, value))
@@ -73,6 +104,10 @@ pub enum Field {
     Rss,
     Vsize,
     Cmdline,
+    Age,
+    Maps,
+    State,
+    Cwd,
     #[cfg(test)]
     A,
 }
@@ -86,6 +121,10 @@ impl Field {
             "rss" => Ok(Field::Rss),
             "cmdline" => Ok(Field::Cmdline),
             "vsize" | "vmsize" => Ok(Field::Vsize),
+            "age" => Ok(Field::Age),
+            "maps" => Ok(Field::Maps),
+            "state" => Ok(Field::State),
+            "cwd" => Ok(Field::Cwd),
             #[cfg(test)]
             "a" | "b" | "c" => Ok(Field::A),
             _ => Err(format!("Field '{}' not recognized", s))
@@ -141,6 +180,48 @@ impl Field {
 
             }
             Field::Cmdline =>  Ok(Value::build_string(s)),
+            Field::Age => {
+                DURATION_REGEX.captures(s)
+                    .and_then(|caps| {
+                        Some((caps.get(1)?.as_str(), caps.get(2)?.as_str()))
+                    })
+                    .and_then(|(num_part, unit_part)| {
+                        let num_part = i64::from_str_radix(num_part, 10).ok()?;
+                        let now = Local::now();
+
+                        match unit_part {
+                            "s" | "sec" | "second" | "seconds" => Some(Value::Duration(Duration::seconds(num_part))),
+                            "m" | "min" | "minute" | "minutes" => Some(Value::Duration(Duration::minutes(num_part))),
+                            "h" | "hr" | "hour" | "hours" => Some(Value::Duration(Duration::hours(num_part))),
+                            "d" | "day" | "days" => Some(Value::Duration(Duration::days(num_part))),
+                            _ => None
+                        }
+
+                    })
+                    .ok_or(format!("Unable to parse {:?} as a duration or date", s))
+            }
+            Field::Maps =>  Ok(Value::build_string(s)),
+            Field::State => {
+                if s.len() == 1 {
+                    ProcState::from_char(s.chars().next().unwrap()).map(Value::State).ok_or(format!("Unable to parse {:?} as a process state", s))
+                } else {
+                    match s {
+                        "running" => Ok(Value::State(ProcState::Running)),
+                        "sleeping" => Ok(Value::State(ProcState::Sleeping)),
+                        "waiting" => Ok(Value::State(ProcState::Waiting)),
+                        "zombie" => Ok(Value::State(ProcState::Zombie)),
+                        "stopped" => Ok(Value::State(ProcState::Stopped)),
+                        "tracing" => Ok(Value::State(ProcState::Tracing)),
+                        "dead" => Ok(Value::State(ProcState::Dead)),
+                        "wakekill" => Ok(Value::State(ProcState::Wakekill)),
+                        "waking" => Ok(Value::State(ProcState::Waking)),
+                        "parked" => Ok(Value::State(ProcState::Parked)),
+                        _ => Err(format!("Unable to parse {:?} as a process state", s))
+                    }
+                }
+
+            }
+            Field::Cwd =>  Ok(Value::build_string(s)),
         }
     }
 }
@@ -197,6 +278,15 @@ impl Op {
             _ => panic!("Called compare_str on a non-string operator")
         }
     }
+    fn compare_eq<T>(&self, a: T, b: T) -> bool
+    where T: PartialEq  {
+        match *self {
+            Op::Unknown(ref s) => panic!("Called compare_str on an unknown operator {}", s),
+            Op::Equals => a == b,
+            Op::NotEquals => a != b,
+            _ => panic!("Called compare_eq on a non-equality operator"),
+        }
+    }
 }
 
 
@@ -206,6 +296,10 @@ pub enum Value {
     Unitless(i32),
     Bytes(i32),
     Percent(f32),
+    Duration(chrono::Duration),
+    Date(chrono::DateTime<Local>),
+    State(ProcState)
+
 }
 
 impl Value {
@@ -264,7 +358,11 @@ mod test {
         let value = Field::Rss.build_value_from_str("4%").unwrap();
         assert_eq!(value, Value::Percent(0.04f32));
 
-
+        let value = Field::Age.build_value_from_str("5s").unwrap();
+        assert_eq!(value, Value::Duration(chrono::Duration::seconds(5)));
+        //if let Value::Duration(d) = value {
+        //    assert_eq!(d
+        //}
 
 
     }
