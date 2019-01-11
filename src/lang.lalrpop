@@ -1,6 +1,6 @@
 
-use ast;
-use lexer;
+use crate::ast;
+use crate::lexer;
 
 
 grammar;

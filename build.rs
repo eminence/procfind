@@ -1,3 +1,9 @@
+extern crate lalrpop;
 fn main() {
-    lalrpop::process_root().unwrap();
+    println!("Running build...");
+    lalrpop::Configuration::new()
+        .log_verbose()
+        .process_file("src/lang.lalrpop").unwrap();
+
+    println!("Done building");
 }
