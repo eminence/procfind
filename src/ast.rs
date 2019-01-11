@@ -79,7 +79,7 @@ impl Clause {
                     let full_cmd = p.cmdline().unwrap().join(" ");
                     Ok(op.compare_str(&full_cmd, s))
                 }
-                (Field::Maps, op, Value::S(s)) => if let ProcResult::Ok(maps) = p.maps() {
+                (Field::Maps, op, Value::S(s)) => if let Ok(maps) = p.maps() {
                     // check to see if this string is in the pathname of any of the maps of this
                     // process
                     Ok(maps.iter().any(|map| match map.pathname {
@@ -93,7 +93,7 @@ impl Clause {
                     Ok(op.compare_eq(p.stat.state(), *state))
                 }
                 (Field::Cwd, op, Value::S(s)) => match p.cwd() {
-                    ProcResult::Ok(cwd) => Ok(op.compare_str(&cwd.to_string_lossy(), s)),
+                    Ok(cwd) => Ok(op.compare_str(&cwd.to_string_lossy(), s)),
                     _ => Ok(false),
                 },
 

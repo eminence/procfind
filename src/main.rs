@@ -177,7 +177,7 @@ impl<'a, 'b> std::fmt::Display for ProcFormatter<'a, 'b> {
                 "comm" => write!(f, "{}", self.proc_obj.stat.comm)?,
                 "cmdline" => {
                     let cmdline = self.proc_obj.cmdline();
-                    if let ProcResult::Ok(cmdline) = cmdline {
+                    if let Ok(cmdline) = cmdline {
                         write!(f, "{}", cmdline.join(" "))?
                     } else {
                         write!(f, "?")?

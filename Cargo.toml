@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["Andrew Chin <achin@eminence32.net>"]
 
 [build-dependencies]
-lalrpop = "0.15.2"
+lalrpop = "0.16"
 
 [dependencies]
-lalrpop-util = "0.15.2"
-regex = "0.2.1"
+lalrpop-util = "0.16"
+regex = "1"
 #procfs = {git="https://github.com/eminence/procfs"}
 procfs = "*"
 lazy_static = "1"
