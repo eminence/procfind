@@ -1,14 +1,4 @@
-#![feature(nll)]
-
-extern crate chrono;
-extern crate clap;
-extern crate lalrpop_util;
-extern crate libc;
-extern crate procfs;
-extern crate regex;
-
-#[macro_use]
-extern crate lazy_static;
+use lazy_static::lazy_static;
 
 use procfs::{Meminfo, ProcResult, Process};
 
@@ -40,7 +30,7 @@ fn parse(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ast::{Op, RawClause};
+    use crate::ast::{Op, RawClause};
     use std::cmp::PartialEq;
     use std::fmt::Debug;
 

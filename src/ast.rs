@@ -1,13 +1,8 @@
-#[cfg(test)]
-extern crate libc;
-
-extern crate chrono;
-
 use chrono::offset::Local;
 use chrono::Duration;
 use procfs::{MMapPath, ProcResult, ProcState, Process};
-use util;
-use {BYTES_REGEX, DURATION_REGEX, MEMINFO};
+use crate::util;
+use crate::{BYTES_REGEX, DURATION_REGEX, MEMINFO};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum RawClause {
@@ -325,7 +320,7 @@ mod test {
 
     #[test]
     fn test_value_bytes_regex() {
-        use BYTES_REGEX;
+        use crate::BYTES_REGEX;
         {
             let m = BYTES_REGEX.captures("1248").unwrap();
             let num_part = m.get(1).unwrap();
