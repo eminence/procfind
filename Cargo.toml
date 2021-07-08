@@ -6,10 +6,10 @@ edition = "2018"
 build = "build.rs"
 
 [build-dependencies]
-lalrpop = "0.16"
+lalrpop = "0.19"
 
 [dependencies]
-lalrpop-util = "0.16"
+lalrpop-util = "0.19"
 regex = "1"
 #procfs = {git="https://github.com/eminence/procfs"}
 procfs = "*"
