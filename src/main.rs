@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use procfs::{Meminfo, ProcResult, Process};
+use procfs::{Meminfo, ProcResult, process::Process};
 
 use clap::{App, Arg};
 use regex::Regex;
@@ -263,7 +263,7 @@ fn main() {
         }
     };
 
-    let all_procs = procfs::all_processes();
+    let all_procs = procfs::process::all_processes().unwrap();
     let matching = all_procs
         .iter()
         .filter(|procs| clause.evaluate(procs).unwrap());

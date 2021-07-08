@@ -1,6 +1,6 @@
 use chrono::offset::Local;
 use chrono::Duration;
-use procfs::{MMapPath, ProcResult, ProcState, Process};
+use procfs::process::{MMapPath, ProcState, Process};
 use crate::util;
 use crate::{BYTES_REGEX, DURATION_REGEX, MEMINFO};
 
@@ -67,7 +67,7 @@ impl Clause {
                     (MEMINFO.mem_total as f64 * *pct as f64) as u64,
                 )),
                 (Field::Age, op, Value::Duration(dur)) => {
-                    let proc_age = Local::now() - p.stat.starttime();
+                    let proc_age = Local::now() - p.stat.starttime().map_err(|e| format!("procfs error: {}", e))?;
                     Ok(op.compare_numeric(proc_age, *dur))
                 }
                 (Field::Cmdline, op, Value::S(s)) => {
@@ -85,7 +85,7 @@ impl Clause {
                     Ok(false)
                 },
                 (Field::State, op, Value::State(state)) => {
-                    Ok(op.compare_eq(p.stat.state(), *state))
+                    Ok(op.compare_eq(p.stat.state().map_err(|e| format!("procfs error: {}", e))?, *state))
                 }
                 (Field::Cwd, op, Value::S(s)) => match p.cwd() {
                     Ok(cwd) => Ok(op.compare_str(&cwd.to_string_lossy(), s)),
