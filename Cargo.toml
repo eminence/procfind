@@ -10,7 +10,7 @@ lalrpop = "0.19"
 
 [dependencies]
 lalrpop-util = "0.19"
-regex = "1"
+regex = "1.5.5"
 #procfs = {git="https://github.com/eminence/procfs"}
 procfs = "*"
 lazy_static = "1"
